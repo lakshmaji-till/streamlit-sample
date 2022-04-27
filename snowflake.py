@@ -8,23 +8,11 @@ import plotly.express as px
 import altair as alt
 import numpy as np
 import pandas as pd
+from queries.exec import run_query, init_db
+from queries.input import getOrganizationId
 
-# Initialize connection.
-# Uses st.experimental_singleton to only run once.
-@st.experimental_singleton
-def init_connection():
-    return snowflake.connector.connect(**st.secrets["snowflake"])
 
-conn = init_connection()
-
-# Perform query.
-# Uses st.experimental_memo to only rerun when the query changes or after 10 min.
-@st.experimental_memo(ttl=600)
-def run_query(query, extras = {}):
-    with conn.cursor() as cur:
-        cur.execute(query, extras)
-        return cur.fetchall()
-
+conn = init_db()
 # rows = run_query("SELECT * from ORDERS;")
 
 # Print results.
@@ -91,26 +79,25 @@ st.altair_chart(c, use_container_width=True)
 
 
 
-query_params = st.experimental_get_query_params()
-query_params
     
-organizationId = query_params['organizationId']    
+organizationId = getOrganizationId()    
+st.write('query_params: organizationId',organizationId)
     
     
 # try dynamic charts
 
-ordersColumns = run_query('SHOW COLUMNS IN TABLE ORDERS');
+ordersColumns = run_query(conn, 'SHOW COLUMNS IN TABLE ORDERS');
 # rows = run_query("SELECT ORDER_NUMBER, ORGANIZATION_ID, ORDER_TYPE_ID from ORDERS;")
 st.subheader('Columns from orders table')
 st.dataframe(ordersColumns)
 
-customerColumns = run_query('SHOW COLUMNS IN TABLE CUSTOMERS');
+customerColumns = run_query(conn, 'SHOW COLUMNS IN TABLE CUSTOMERS');
 # rows = run_query("SELECT ORDER_NUMBER, ORGANIZATION_ID, ORDER_TYPE_ID from ORDERS;")
 st.subheader('Columns from customer table')
 st.dataframe(customerColumns)
 
 
-orderPaymentsColumns = run_query('SHOW COLUMNS IN TABLE ORDER_PAYMENTS');
+orderPaymentsColumns = run_query(conn, 'SHOW COLUMNS IN TABLE ORDER_PAYMENTS');
 # rows = run_query("SELECT ORDER_NUMBER, ORGANIZATION_ID, ORDER_TYPE_ID from ORDERS;")
 st.subheader('Columns from order payments table')
 st.dataframe(orderPaymentsColumns)
@@ -119,8 +106,8 @@ st.dataframe(orderPaymentsColumns)
 
 
 
-paymentTypesRecords = run_query('select payment_type_name as paymentMethod, count(payment_type_id) as noOfOrders from order_payments group by payment_type_name');
-paymentTypesRecordsCount = run_query('select count(*) from order_payments');
+paymentTypesRecords = run_query(conn, 'select payment_type_name as paymentMethod, count(payment_type_id) as noOfOrders from order_payments group by payment_type_name');
+paymentTypesRecordsCount = run_query(conn, 'select count(*) from order_payments');
 st.subheader('Payment Methods')
 st.subheader(paymentTypesRecordsCount)
 st.subheader("Product Variation Breakdown")
@@ -146,7 +133,7 @@ WHERE (orders."ORGANIZATION_ID" ) = %(organizationId)s
 """
 
 
-totalRevenueRecord = run_query(totalRevenue, {'organizationId':organizationId});
+totalRevenueRecord = run_query(conn, totalRevenue, {'organizationId':organizationId});
 st.subheader('Total Revenue')
 st.write(list(totalRevenueRecord[0])[0])
 
@@ -163,7 +150,7 @@ WHERE (orders."ORGANIZATION_ID" ) IS NOT NULL
 FETCH NEXT 500 ROWS ONLY
 """
 
-avgGuestSpendRecord = run_query(avgGuestSpend);
+avgGuestSpendRecord = run_query(conn,avgGuestSpend);
 st.subheader('Avg Guest Spend')
 st.write(list(avgGuestSpendRecord[0])[0])
 
@@ -188,7 +175,7 @@ FETCH NEXT 4 ROWS ONLY
 
 """
 
-productCategoryBreakDownRecords = run_query(productCategoryBreakDownSql);
+productCategoryBreakDownRecords = run_query(conn,productCategoryBreakDownSql);
 st.subheader('Product Category Breakdown')
 fig2 = px.pie(productCategoryBreakDownRecords, values=1, names=0, title='Product Category Breakdown')
 st.plotly_chart(fig2)
@@ -222,7 +209,7 @@ FETCH NEXT 500 ROWS ONLY
 
 """
 
-topPerformaingProductsRecords = run_query(topPerformaingProductsSql);
+topPerformaingProductsRecords = run_query(conn, topPerformaingProductsSql);
 st.subheader('Top Performing products by revenue & qty sold')
 st.dataframe(topPerformaingProductsRecords)
 
@@ -270,7 +257,7 @@ FETCH NEXT 500 ROWS ONLY
 
 """
 
-weekOnWeekSalesRecords = run_query(weekOnWeekSalesSql);
+weekOnWeekSalesRecords = run_query(conn, weekOnWeekSalesSql);
 st.subheader('Week on Week Sales')
 st.dataframe(weekOnWeekSalesRecords)
 fig4 = px.line(weekOnWeekSalesRecords, x=0, y=1)
